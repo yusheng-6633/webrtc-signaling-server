@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebRTC Client</title>
+</head>
+<body>
+    <h1>WebRTC Signaling Test</h1>
+    <script src="/socket.io/socket.io.js"></script> <!-- 或者從 CDN 引入 -->
+    <script>
+        // 連接到你的 Socket.IO 伺服器
+        // 如果你的伺服器運行在不同的主機或端口，請相應地更改 URL
+        const socket = io('http://localhost:3000'); // 假設伺服器在本機 3000 端口
+
+        socket.on('connect', () => {
+            console.log('Connected to signaling server! My ID is', socket.id);
+
+            // 連線成功後，你可以嘗試加入或創建一個房間
+            const roomName = 'myTestRoom';
+            console.log('Attempting to create or join room:', roomName);
+            socket.emit('create or join', roomName);
+        });
+
+        socket.on('created', (room, clientId) => {
+            console.log(`Room ${room} created. I am ${clientId}.`);
+            // 你是房間的創建者
+        });
+
+        socket.on('joined', (room, clientId) => {
+            console.log(`Joined room ${room}. My ID is ${clientId}.`);
+            // 你已成功加入房間
+        });
+
+        socket.on('ready', (room) => {
+            console.log(`Room ${room} is ready for WebRTC connection.`);
+            // 此時，房間內的兩個客戶端可以開始 WebRTC 的 Offer/Answer 交換
+        });
+
+        socket.on('full', (room) => {
+            console.log(`Room ${room} is full.`);
+            alert(`Room ${room} is full.`);
+        });
+
+        socket.on('message', (message) => {
+            console.log('Received message from peer:', message);
+            // 處理來自對等方的信令消息 (e.g., SDP offer/answer, ICE candidates)
+        });
+
+        socket.on('user disconnected', (userId) => {
+            console.log('User disconnected:', userId);
+            // 處理對等方斷開連接的邏輯
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Disconnected from signaling server.');
+        });
+
+        // 範例：發送信令消息 (通常在 WebRTC 設置過程中)
+        function sendMessageToRoom(room, data) {
+            console.log('Sending message to room', room, ':', data);
+            socket.emit('message', { room: room, content: data });
+        }
+
+        // 為了測試，你可以在控制台調用 sendMessageToRoom
+        // 例如: sendMessageToRoom('myTestRoom', { type: 'offer', sdp: '...' });
+
+    </script>
+</body>
+</html>
+
