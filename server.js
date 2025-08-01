@@ -1,11 +1,23 @@
 // server.js
 const express = require('express');
-const http = require('http');
+const https = require('https'); // 引入 https 模組
+const fs = require('fs');       // 引入 fs 模組來讀取檔案
 const socketIo = require('socket.io');
 
 const app = express();
-const server = http.createServer(app);
-const io = socketIo(server, {
+
+// --- HTTPS 設定 ---
+// 您需要提供自己的 SSL 憑證檔案。
+// 對於本地開發，您可以產生一個自簽名憑證。
+// 對於正式環境，請使用由受信任的憑證頒發機構 (如 Let's Encrypt) 提供的憑證。
+const options = {
+  key: fs.readFileSync('./certs/private.key'),      // 將此路徑替換為您的私鑰檔案 (.key)
+  cert: fs.readFileSync('./certs/certificate.pem') // 將此路徑替換為您的憑證檔案 (.pem 或 .crt)
+};
+// --------------------
+
+const httpsServer = https.createServer(options, app); // 建立 HTTPS 伺服器
+const io = socketIo(httpsServer, {                    // 將 Socket.IO 附加到 HTTPS 伺服器
   cors: {
     origin: "*", // 允許所有網域
     methods: ["GET", "POST"]
@@ -15,7 +27,7 @@ const io = socketIo(server, {
 const rooms = {}; // 用來存放房間資訊
 
 io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
+  console.log('User connected via secure connection:', socket.id);
 
   socket.on('create or join', (roomName) => {
     console.log('Received request to create or join room ' + roomName);
@@ -72,6 +84,7 @@ io.on('connection', (socket) => {
 });
 
 const port = process.env.PORT || 3000;
-server.listen(port, () => {
-  console.log(`Signaling server listening on port ${port}`);
+httpsServer.listen(port, () => {
+  console.log(`✅ Secure Signaling server listening on port ${port}`);
 });
+
