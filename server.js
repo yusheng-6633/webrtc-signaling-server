@@ -44,7 +44,7 @@ io.on('connection', (socket) => {
     if (!room) {
       // 房間不存在
       socket.emit('absence', roomName);
-      console.log(`Room '${roomName}' not found. Notifying ${socket.id}.`);
+      console.log(`Room '${roomName}' absence. Notifying ${socket.id}.`);
       return;
     }
 
@@ -94,13 +94,30 @@ io.on('connection', (socket) => {
 
     // 清理房間資訊 (重要)
     for (const roomName in rooms) {
-      if (rooms[roomName].participants.includes(socket.id)) {
-        rooms[roomName].participants = rooms[roomName].participants.filter(id => id !== socket.id);
-        if (rooms[roomName].participants.length === 0) {
+      const room = rooms[roomName];
+      const participantIndex = room.participants.indexOf(socket.id);
+
+      // 檢查使用者是否在此房間中
+      if (participantIndex > -1) {
+        console.log(`User ${socket.id} is leaving room '${roomName}'.`);
+
+        // 檢查離開的是否為建立者 (陣列中的第一個成員)
+        if (participantIndex === 0) {
+          console.log(`Creator ${socket.id} left. Deleting room '${roomName}'.`);
+          // 通知房間內另一位成員，房間已關閉
+          socket.broadcast.to(roomName).emit('room closed', { room: roomName, reason: 'Creator has left.' });
+          // 從 rooms 物件中刪除整個房間
           delete rooms[roomName];
+          console.log(`Room '${roomName}' has been cleared.`);
         } else {
-          io.sockets.in(roomName).emit('user disconnected', socket.id); // 通知其他使用者
+          // 離開的是加入者，只將他從房間移除
+          console.log(`Joiner ${socket.id} left room '${roomName}'.`);
+          room.participants.splice(participantIndex, 1);
+          // 通知房間建立者，對方已離開
+          socket.broadcast.to(roomName).emit('peer left', { userId: socket.id });
+          console.log(`Room '${roomName}' now has ${room.participants.length} participant(s).`);
         }
+        // 找到房間並處理後即可跳出迴圈
         break;
       }
     }
@@ -112,5 +129,6 @@ const port = process.env.PORT || 3000;
 server.listen(port, () => {
   console.log(`Signaling server listening on port ${port}`);
 });
+
 
 
