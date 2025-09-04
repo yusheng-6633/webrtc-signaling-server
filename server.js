@@ -17,32 +17,51 @@ const rooms = {}; // 用來存放房間資訊
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
-  socket.on('create or join', (roomName) => {
-    console.log('Received request to create or join room ' + roomName);
+  // 處理 'create' 事件：使用者想要建立一個新房間
+  socket.on('create', (roomName) => {
+    console.log(`Received request to create room '${roomName}' from ${socket.id}`);
 
-    if (!rooms[roomName]) {
+    if (rooms[roomName]) {
+      // 房間已存在
+      socket.emit('exists', roomName);
+      console.log(`Room '${roomName}' already exists. Notifying ${socket.id}.`);
+    } else {
+      // 建立新房間
       rooms[roomName] = {
-        participants: [],
+        participants: [socket.id],
       };
+      socket.join(roomName);
+      socket.emit('created', roomName, socket.id);
+      console.log(`User ${socket.id} created and joined room '${roomName}'`);
+    }
+  });
+
+  // 處理 'join' 事件：使用者想要加入一個已存在的房間
+  socket.on('join', (roomName) => {
+    console.log(`Received request to join room '${roomName}' from ${socket.id}`);
+
+    const room = rooms[roomName];
+    if (!room) {
+      // 房間不存在
+      socket.emit('absence', roomName);
+      console.log(`Room '${roomName}' not found. Notifying ${socket.id}.`);
+      return;
     }
 
-    const numClients = rooms[roomName].participants.length;
+    const numClients = room.participants.length;
 
-    console.log(roomName + ' now has ' + (numClients + 1) + ' client(s)');
-
-    if (numClients === 0) {
+    if (numClients === 1) {
+      // 房間內已有一個人，可以加入
       socket.join(roomName);
-      rooms[roomName].participants.push(socket.id);
-      socket.emit('created', roomName, socket.id);
-      console.log('User ' + socket.id + ' created room ' + roomName);
-    } else if (numClients === 1) {
-      socket.join(roomName);
-      rooms[roomName].participants.push(socket.id);
+      room.participants.push(socket.id);
       socket.emit('joined', roomName, socket.id);
-      io.sockets.in(roomName).emit('ready', roomName);  //通知雙方可以開始連線
-      console.log('User ' + socket.id + ' joined room ' + roomName);
-    } else { // max two clients
+      // 通知房間內的所有人，可以開始連線
+      io.sockets.in(roomName).emit('ready', roomName);
+      console.log(`User ${socket.id} joined room '${roomName}'. Room now has 2 participants.`);
+    } else {
+      // 房間已滿 (已有兩人)
       socket.emit('full', roomName);
+      console.log(`Room '${roomName}' is full. Notifying ${socket.id}.`);
     }
   });
 
